@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fuel route planner</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>#map{height:70vh}input{margin:8px}#summary{white-space:pre-wrap}</style></head>
+<body><h1>Fuel route planner</h1><form id="form">
+<input id="start" placeholder="Start, USA" required><input id="finish" placeholder="Finish, USA" required>
+<button>Plan route</button></form><p>Starts with 50 gallons; keeps a 2-gallon reserve. CSV prices are not live.</p>
+<pre id="summary"></pre><div id="map"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const map=L.map('map').setView([39,-98],4);
+L.tileLayer(
+  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+  {
+    attribution:
+      '&copy; Esri'
+  }
+).addTo(map);
+let group=L.featureGroup().addTo(map);
+document.getElementById('form').onsubmit=async event=>{
+ event.preventDefault(); const summary=document.getElementById('summary'); summary.textContent='Planning...';
+ try {
+ const response=await fetch('/api/route/',{method:'POST',headers:{'Content-Type':'application/json'},
+ body:JSON.stringify({start:document.getElementById('start').value,finish:document.getElementById('finish').value})});
+ const data=await response.json(); if(!response.ok)throw new Error(JSON.stringify(data));
+ group.clearLayers(); L.geoJSON(data.route_geojson).addTo(group);
+ for(const [label,coords] of [['Start',data.start_coordinates],['Finish',data.finish_coordinates]])
+ L.marker([coords[1],coords[0]]).bindPopup(label).addTo(group);
+ for(const stop of data.fuel_stops){
+ const text=document.createElement('div');
+ text.textContent=`${stop.name}, ${stop.city}, ${stop.state}: buy ${stop.gallons_to_buy.toFixed(2)} gallons at $${stop.price_per_gallon}/gallon ($${stop.cost_usd.toFixed(2)})`;
+ L.marker([stop.latitude,stop.longitude]).bindPopup(text).addTo(group); }
+ map.fitBounds(group.getBounds());
+ summary.textContent=`Distance: ${data.distance_miles} miles\nFuel purchased: ${data.fuel_purchased_gallons} gallons\nFuel purchase cost: $${data.total_fuel_cost_usd.toFixed(2)}\nStops: ${data.fuel_stops.length}\nInitial tank cost excluded. Station selection is heuristic, not globally optimal.`;
+ }catch(error){summary.textContent=error.message;}
+};
+</script></body></html>
