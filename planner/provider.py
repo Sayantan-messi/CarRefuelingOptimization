@@ -6,7 +6,7 @@ class ProviderError(Exception):
     pass
 
 
-USER_AGENT = "fuel-route-assessment/1.0"
+USER_AGENT = "car-fueling-optimization/1.0"
 
 
 def _get(url, params=None):
