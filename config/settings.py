@@ -9,10 +9,15 @@ ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1,test
 INSTALLED_APPS = ["django.contrib.contenttypes", "django.contrib.auth", "rest_framework", "planner"]
 MIDDLEWARE = ["django.middleware.security.SecurityMiddleware", "django.middleware.common.CommonMiddleware", "django.middleware.csrf.CsrfViewMiddleware"]
 ROOT_URLCONF = "config.urls"
+DATABASE_PATH = Path(os.environ.get("DJANGO_DB_PATH") or BASE_DIR / "db.sqlite3")
+if not DATABASE_PATH.is_absolute():
+    DATABASE_PATH = BASE_DIR / DATABASE_PATH
+# SQLite creates the file, but cannot create missing parent directories.
+DATABASE_PATH.parent.mkdir(parents=True, exist_ok=True)
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db" / "db.sqlite3",
+        "NAME": DATABASE_PATH,
     }
 }
 TEMPLATES = [{"BACKEND": "django.template.backends.django.DjangoTemplates", "DIRS": [BASE_DIR / "templates"], "APP_DIRS": True}]

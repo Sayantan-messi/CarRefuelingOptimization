@@ -1,5 +1,43 @@
+import os
+import runpy
+import sqlite3
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
+
 from django.test import SimpleTestCase
 from .optimizer import Stop, optimize, Infeasible
+
+
+class DatabaseConfigurationTests(SimpleTestCase):
+    def load_settings(self):
+        settings_file = Path(__file__).resolve().parent.parent / "config" / "settings.py"
+        with patch("dotenv.load_dotenv"):
+            return runpy.run_path(str(settings_file))
+
+    def test_default_uses_existing_project_database(self):
+        with patch.dict(os.environ):
+            os.environ.pop("DJANGO_DB_PATH", None)
+            settings = self.load_settings()
+        self.assertEqual(
+            settings["DATABASES"]["default"]["NAME"],
+            settings["BASE_DIR"] / "db.sqlite3",
+        )
+
+    def test_custom_database_creates_missing_parent_directories(self):
+        with TemporaryDirectory() as directory:
+            database_path = Path(directory) / "nested" / "db" / "db.sqlite3"
+            with patch.dict(os.environ, {"DJANGO_DB_PATH": str(database_path)}):
+                settings = self.load_settings()
+            self.assertEqual(settings["DATABASES"]["default"]["NAME"], database_path)
+            self.assertTrue(database_path.parent.is_dir())
+            connection = sqlite3.connect(database_path)
+            try:
+                self.assertEqual(connection.execute("SELECT 1").fetchone(), (1,))
+            finally:
+                connection.close()
+
+
 class OptimizerTests(SimpleTestCase):
     def test_short_trip(self):
         purchases,left=optimize([],100,50,0)
